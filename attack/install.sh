@@ -6,6 +6,14 @@
 # From a local checkout:
 #   sudo bash attack/install.sh
 #
+# By default apt/make/npm output is hidden — only the "==>" progress lines
+# print, so demo runs stay clean. Pass --view (or -v) to see full output:
+#   sudo bash attack/install.sh --view
+#   curl -sSf .../install.sh | sudo bash -s -- --view   # note the `-s --`,
+#                                                        # needed so bash
+#                                                        # forwards the flag
+#                                                        # instead of eating it
+#
 # INSECURE BY DESIGN. Installs a system-bus D-Bus service that runs
 # `rm -rf` as root on any path a local user supplies, plus a Chrome
 # native-messaging host that forwards browser-extension input to it.
@@ -17,10 +25,30 @@ REPO_URL="https://github.com/scienmanas/Bussie.git"
 INSTALL_PREFIX="/opt/bussie"
 EXTENSION_ID="bmcdglmldgcgdlodlkdimbpofnpcmijn"
 
+VERBOSE=0
+for arg in "$@"; do
+    case "$arg" in
+        -v|--verbose|--view) VERBOSE=1 ;;
+    esac
+done
+
 c_red()   { printf "\033[31m%s\033[0m\n" "$*"; }
 c_green() { printf "\033[32m%s\033[0m\n" "$*"; }
 c_blue()  { printf "\033[34m%s\033[0m\n" "$*"; }
 step()    { c_blue "==> $*"; }
+
+# Run a command quietly, only surfacing its output if it fails (or --view is set).
+LOG_FILE="$(mktemp)"
+trap 'rm -f "$LOG_FILE"' EXIT
+run() {
+    if [[ $VERBOSE -eq 1 ]]; then
+        "$@"
+    elif ! "$@" >"$LOG_FILE" 2>&1; then
+        c_red "Command failed: $*"
+        cat "$LOG_FILE" >&2
+        exit 1
+    fi
+}
 
 # -------- 0. require root ------------------------------------------------
 if [[ $EUID -ne 0 ]]; then
@@ -40,15 +68,15 @@ if [[ -n "$SCRIPT_PATH" && -f "$(dirname "$SCRIPT_PATH")/service/Makefile" ]]; t
 else
     step "No local checkout detected — cloning $REPO_URL into $INSTALL_PREFIX"
     if [[ ! -x "$(command -v git)" ]]; then
-        apt-get update -qq
-        apt-get install -y --no-install-recommends git
+        run apt-get update -qq
+        run apt-get install -y --no-install-recommends git
     fi
     if [[ -d "$INSTALL_PREFIX/.git" ]]; then
-        git -C "$INSTALL_PREFIX" fetch --depth 1 origin
-        git -C "$INSTALL_PREFIX" reset --hard origin/HEAD
+        run git -C "$INSTALL_PREFIX" fetch --depth 1 origin
+        run git -C "$INSTALL_PREFIX" reset --hard origin/HEAD
     else
         rm -rf "$INSTALL_PREFIX"
-        git clone --depth 1 "$REPO_URL" "$INSTALL_PREFIX"
+        run git clone --depth 1 "$REPO_URL" "$INSTALL_PREFIX"
     fi
     ATTACK_DIR="$INSTALL_PREFIX/attack"
 fi
@@ -56,8 +84,8 @@ cd "$ATTACK_DIR"
 
 # -------- 2. apt dependencies -------------------------------------------
 step "Installing build & runtime dependencies"
-apt-get update -qq
-apt-get install -y --no-install-recommends \
+run apt-get update -qq
+run apt-get install -y --no-install-recommends \
     build-essential \
     pkg-config \
     libdbus-1-dev \
@@ -69,11 +97,11 @@ apt-get install -y --no-install-recommends \
 # -------- 3. build native binaries --------------------------------------
 step "Building bussie-service (C++ D-Bus service)"
 make -C service clean >/dev/null 2>&1 || true
-make -C service
+run make -C service
 
 step "Building bussie-bridge (C++ native-messaging host)"
 make -C bridge clean >/dev/null 2>&1 || true
-make -C bridge
+run make -C bridge
 
 # -------- 4. install binaries -------------------------------------------
 step "Installing binaries to /usr/local"
@@ -100,15 +128,15 @@ rm -f "$NM_TMP"
 
 # -------- 7. start the service ------------------------------------------
 step "Reloading systemd and starting bussie.service"
-systemctl daemon-reload
-systemctl enable --now bussie.service
-systemctl reload dbus || systemctl restart dbus
+run systemctl daemon-reload
+run systemctl enable --now bussie.service
+run bash -c 'systemctl reload dbus || systemctl restart dbus'
 
 # -------- 8. build the Chrome extension ---------------------------------
 step "Installing extension npm deps and building"
 cd "$ATTACK_DIR/extension"
-npm ci --no-audit --no-fund
-npm run build
+run npm ci --no-audit --no-fund
+run npm run build
 EXT_BUILD_DIR="$ATTACK_DIR/extension/build"
 
 # -------- 9. summary ----------------------------------------------------
