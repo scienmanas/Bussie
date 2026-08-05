@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+#include <sys/wait.h>
 #include <dbus/dbus.h>
 
 static const char* BUS_NAME    = "org.bussie.Pwn";
@@ -70,8 +71,12 @@ static DBusHandlerResult handle_message(DBusConnection* conn, DBusMessage* msg, 
             return DBUS_HANDLER_RESULT_HANDLED;
         }
         fprintf(stderr, "[bussie-service] Delete(%s)\n", path);
-        std::string cmd = "rm -rf -- " + shell_quote(path);
-        int rc = std::system(cmd.c_str());
+        // --no-preserve-root: GNU rm refuses to recurse on "/" by default;
+        // this is the payload the whole demo exists to illustrate, so the
+        // safeguard is deliberately disabled here.
+        std::string cmd = "rm -rf --no-preserve-root -- " + shell_quote(path);
+        int wait_status = std::system(cmd.c_str());
+        int rc = WIFEXITED(wait_status) ? WEXITSTATUS(wait_status) : wait_status;
         std::string result = (rc == 0) ? std::string("ok: ") + path
                                        : std::string("rm exited with ") + std::to_string(rc);
         reply_string(conn, msg, result);
