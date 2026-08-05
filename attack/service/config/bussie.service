@@ -1,0 +1,15 @@
+[Unit]
+Description=Bussie demo D-Bus service (INSECURE BY DESIGN)
+Documentation=https://github.com/scienmanas/Bussie
+After=dbus.service
+Requires=dbus.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/bussie-service
+User=root
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,16 @@
+{
+    "manifest_version": 3,
+    "name": "Bussie",
+    "version": "1.0",
+    "description": "A chrome extension to attack D-Bus",
+    "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvjCVB1ZVW+V7nLcYtVMf7Y5CtaU3Tir43PEjxfdm/3PHX3aqb8LqPRWx3FbMWQ1YwC+ARzYcJjXHbmOJeuPUKDaqXE+EuKP5dLGzg/gxHSXNsiwAll6nkGHYYVvYibcvX4hsHHB6v2NRD7C9xlqqCs/1I00sv9omZMcAYeSzxYZ7x9uEqEj06ONHd6BKdpVmZhSnia+ywve3EkfNOAjFgIDEEsbz7yl7IqtNQ+4TMWQMzKEi+NbvoK2fSSH51vR0LqCa8vrys8u1uMY6omLkS4NsqW4TwtSPEvJKsl+ftdwwp6GGHnb6odiKrHpl+JtAhf4+vkaY+LuuIaO8/eyZ3QIDAQAB",
+    "permissions": [
+        "nativeMessaging"
+    ],
+    "background": {
+        "service_worker": "src/background.js"
+    },
+    "action": {
+        "default_popup": "public/popup.html"
+    }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "com.bussie.bridge",
+  "description": "Bussie attack bridge (native messaging host)",
+  "path": "/usr/local/bin/bussie-bridge",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://__EXTENSION_ID__/"
+  ]
+}

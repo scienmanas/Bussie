@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Bussie</title>
+    <style>
+        body { font-family: system-ui, sans-serif; width: 320px; padding: 12px; margin: 0; }
+        .warn { background: #ffe5e5; border: 1px solid #c00; color: #900;
+                padding: 8px; border-radius: 4px; font-size: 12px; margin-bottom: 10px; }
+        label { display: block; font-size: 12px; margin: 6px 0 4px; }
+        input[type=text] { width: 100%; box-sizing: border-box; padding: 6px;
+                           font-family: monospace; font-size: 13px; }
+        button { margin-top: 8px; width: 100%; padding: 8px;
+                 background: #c00; color: white; border: 0;
+                 font-weight: bold; cursor: pointer; border-radius: 4px; }
+        button:hover { background: #900; }
+        pre { background: #f4f4f4; padding: 8px; font-size: 11px;
+              white-space: pre-wrap; word-break: break-all;
+              border-radius: 4px; max-height: 200px; overflow: auto; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="warn">
+        <strong>DEMO ONLY — destructive.</strong>
+        This extension forwards a path to a root-owned D-Bus service that runs
+        <code>rm -rf</code>. Run in a VM with a snapshot.
+    </div>
+    <label for="path">Path to delete:</label>
+    <input type="text" id="path" placeholder="/tmp/bussie-demo-victim" autocomplete="off"/>
+    <button id="go">Destroy</button>
+    <pre id="out">(no response yet)</pre>
+    <script src="../src/popup.js"></script>
+</body>
+</html>
