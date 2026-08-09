@@ -6,6 +6,47 @@ This project has three parts
 2. A testing set of program to understand D-Bus (C++).
 3. A chrome extenstion and a dbus service running with root priviledges to mitigate D-Bus based attacks.
 
+## Table of Contents
+
+- [OS Requirements](#os-requirements)
+- [D-Bus addressing: bus name, object path, interface](#d-bus-addressing-bus-name-object-path-interface)
+  - [One process can host many objects](#one-process-can-host-many-objects)
+  - [One object can implement many interfaces](#one-object-can-implement-many-interfaces)
+  - [One interface can be implemented by many objects](#one-interface-can-be-implemented-by-many-objects)
+  - [In Bussie](#in-bussie)
+  - [The HTTP analogy](#the-http-analogy)
+- [D-Bus: Session Bus vs System Bus](#d-bus-session-bus-vs-system-bus)
+  - [Session Bus](#session-bus)
+  - [System Bus](#system-bus)
+  - [Quick comparison](#quick-comparison)
+  - [Why this matters for security](#why-this-matters-for-security)
+  - [Inspecting each bus](#inspecting-each-bus)
+- [How Chrome talks to D-Bus: the GNOME bridge pattern](#how-chrome-talks-to-d-bus-the-gnome-bridge-pattern)
+  - [How Bussie's attack mirrors this exactly](#how-bussies-attack-mirrors-this-exactly)
+  - ["But why D-Bus at all? Couldn't the native host just do the work?"](#but-why-d-bus-at-all-couldnt-the-native-host-just-do-the-work)
+- [System dependencies (one script for the whole repo)](#system-dependencies-one-script-for-the-whole-repo)
+- [Run the Project (First Part) — Python](#run-the-project-first-part--python)
+- [Run the Project (Second Part) — C++](#run-the-project-second-part--c)
+  - [Cross-language demo (this is the point of D-Bus)](#cross-language-demo-this-is-the-point-of-d-bus)
+- [Run the Project (Third Part)](#run-the-project-third-part)
+- [Extra info: PolicyKit, PackageKit, and how privileged GUIs are actually built](#extra-info-policykit-packagekit-and-how-privileged-guis-are-actually-built)
+  - [What PolicyKit (polkit) is](#what-policykit-polkit-is)
+  - [Policy values](#policy-values)
+  - [How polkit shows a dialog when polkitd has no display](#how-polkit-shows-a-dialog-when-polkitd-has-no-display)
+  - [What PackageKit is](#what-packagekit-is)
+  - [The Bussie contrast](#the-bussie-contrast)
+- [Extra info: how this would look in production (Chrome Web Store)](#extra-info-how-this-would-look-in-production-chrome-web-store)
+  - [Step 1 — The Chrome Web Store assigns the ID, not you](#step-1--the-chrome-web-store-assigns-the-id-not-you)
+  - [Step 2 — Bake the assigned ID into your native-messaging manifest](#step-2--bake-the-assigned-id-into-your-native-messaging-manifest)
+  - [Step 3 — Two independent install channels](#step-3--two-independent-install-channels)
+  - [Step 4 — Runtime handshake (same shape as dev)](#step-4--runtime-handshake-same-shape-as-dev)
+  - [Why prod is cryptographically stronger than unpacked dev](#why-prod-is-cryptographically-stronger-than-unpacked-dev)
+  - [The dev–prod parity trick](#the-devprod-parity-trick)
+  - [Real-world example: GNOME Shell integration](#real-world-example-gnome-shell-integration)
+- [Project Tree](#project-tree)
+- [Contribution](#contribution)
+- [LICENSE](#license)
+
 ## OS Requirements
 
 D-Bus (Desktop Bus) in a IPC (Inter process communication) system for Linux based system. We are not doing here extra work to run it on other os as the purpose of this repo is to highlight how browser extension or other programs can communicate to IPCs which obviously may be different for different os, but serve the same purpose to make messaging possible between services on the systems.
@@ -211,7 +252,7 @@ The only real differences are:
 - our policy is **deliberately permissive** (`<policy context="default">` allows any UID to call any method), which is the bug class the demo exists to illustrate;
 - our service's method blindly executes `rm -rf -- <path>` instead of carefully installing a GNOME extension.
 
-Remove the permissive policy block (or scope it to a specific UID/group) and the attack stops at the bus with `AccessDenied`. That single config line is the mitigation.
+Remove the permissive policy block (or scope it to a specific UID/group) and the attack stops at the bus with `AccessDenied`. That single config line is the mitigation — see `attack/README.md`'s [Protection (defense in depth)](attack/README.md#protection-defense-in-depth) section for the fuller set of layers a production service needs beyond just that one line.
 
 ### "But why D-Bus at all? Couldn't the native host just do the work?"
 
@@ -389,6 +430,7 @@ Then in the extension popup, type a path and click *Destroy*:
 - Stage 1: a sandbox path like `/tmp/bussie-demo-victim` — folder vanishes.
 - Stage 2 (snapshot first!): `/` — system dies.
 - Mitigation: delete the `<policy context="default">` block in `/usr/share/dbus-1/system.d/org.bussie.Pwn.conf`, `systemctl reload dbus`, attack stops at the bus.
+- Protection: that one config line is the minimum fix, not the complete one — see [`attack/README.md#protection-defense-in-depth`](attack/README.md#protection-defense-in-depth) for polkit gating, input validation, systemd hardening, and audit logging.
 - Teardown: `sudo bash attack/uninstall.sh` cleans up everything the installer dropped (the Chrome extension itself stays — browsers won't let us remove it).
 
 ## Extra info: PolicyKit, PackageKit, and how privileged GUIs are actually built

@@ -4,6 +4,22 @@ A three-piece demo that walks a payload from a Chrome extension, through a nativ
 
 > **VM only.** This is destructive on purpose. Run it inside a disposable VM with a snapshot. Do not install on a machine with anything you care about.
 
+## Table of Contents
+
+- [Pieces](#pieces)
+- [Install](#install)
+  - [Local-dev iteration (`dev.install.sh`)](#local-dev-iteration-devinstallsh)
+  - [Extension-only builds (`extension/build.sh`)](#extension-only-builds-extensionbuildsh)
+- [Load the extension](#load-the-extension)
+- [Demo flow](#demo-flow)
+  - [Stage 1 — safe sandbox](#stage-1--safe-sandbox)
+  - [Stage 2 — full blast](#stage-2--full-blast)
+  - [Mitigation](#mitigation)
+- [Protection (defense in depth)](#protection-defense-in-depth)
+- [Uninstall](#uninstall)
+- [Direct bridge smoke-test (no Chrome)](#direct-bridge-smoke-test-no-chrome)
+- [Build manually (skip install.sh)](#build-manually-skip-installsh)
+
 ## Pieces
 
 ```
@@ -129,6 +145,22 @@ sudo systemctl reload dbus
 ```
 
 Re-run stage 1. The popup now shows `AccessDenied` — the call is rejected at the bus, before reaching the service. One config line is the difference between a remote shell and a locked door.
+
+## Protection (defense in depth)
+
+The [Mitigation](#mitigation) above closes *this* hole — the one permissive policy block — but it's a single layer. A real system-bus service needs several independent layers, so that one mistake doesn't equal root:
+
+1. **Scope the policy, don't just delete it.** `<policy context="default">` means "any local UID may call this." A production policy either omits that block entirely (deny-by-default, keeping only the `user="root"` ownership block) or scopes it to the specific `user=`/`group=` that actually needs to call the service — not every process on the machine.
+
+2. **Gate the privileged method behind polkit.** The bus policy only decides whether a message *reaches* the service — it isn't an authorization decision. `service.cpp` should call `CheckAuthorization()` against a declared polkit action (e.g. `org.bussie.pwn.delete-path`, set to `auth_admin`) before doing anything destructive. That's the step [PackageKit takes](../README.md#what-packagekit-is) and Bussie deliberately skips — see the top-level README's ["The Bussie contrast"](../README.md#the-bussie-contrast) for the full comparison. With polkit wired in, even a caller the bus policy allows still has to clear a live authentication prompt.
+
+3. **Never expose "run this as root" as the primitive.** The deeper problem is that `Delete(path)` accepts *any* string and shells out to `rm -rf --no-preserve-root`. A safe service doesn't take arbitrary paths — it exposes narrow, purpose-built operations and validates/allowlists input server-side, instead of trusting the caller's string as an argument to something this destructive.
+
+4. **Harden the systemd unit.** `bussie.service` runs as bare `User=root` with no sandboxing. Directives like `ProtectSystem=strict`, `ProtectHome=`, `NoNewPrivileges=true`, `CapabilityBoundingSet=`, and `ReadOnlyPaths=`/`InaccessiblePaths=` shrink what the process can touch even if the D-Bus/polkit layers above it are somehow bypassed.
+
+5. **Log and audit privileged calls.** The demo service only writes to stderr. A real one should log durably (journal, syslog, or an audit subsystem) who called what, so a bypass is at least detectable after the fact instead of silent.
+
+Each layer is a separate check an attacker has to clear. The demo only shows layer 1 falling over, because that's the one line `org.bussie.Pwn.conf` deliberately leaves open — "remove that policy block" is the *minimum* fix, not the complete one.
 
 ## Uninstall
 
